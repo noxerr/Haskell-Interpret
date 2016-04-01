@@ -32,9 +32,9 @@ readNumExpr tokens
 
 readBoolExpr::(Read a,Num a) => [String] -> [BoolExpr a]
 readBoolExpr tokens
-    | ((head tokens) == "END") || ((head tokens) == "THEN") || ((head tokens) == "DO")= []
+    | ((head tokens) == "END") || ((head tokens) == "THEN") = []
     | (head tokens) == "NOT" = [NOT (head $ readBoolExpr (tail tokens))]++(readBoolExpr (tail tokens))
-    | (tokens!!1) == "Gt" = [Gt (readNumExpr [(head tokens)]) (readNumExpr [(tokens!!2)])]++(readBoolExpr (drop 3 tokens))
+    | (tokens!!1) == "Gt" = [Gt (readNumExpr [(head tokens)]) (readNumExpr [(head tokens)])]++(readBoolExpr (tail tokens))
 
 
 
@@ -47,15 +47,3 @@ readBoolExpr tokens
 
 --myAny :: (a -> Bool) -> [a] -> Bool
 --myAny f l = foldr (\x acc -> (f x) || acc) False l
-
-
-
-
-
-
-
-
-
-
-
-
