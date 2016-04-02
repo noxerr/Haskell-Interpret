@@ -4,7 +4,7 @@ data Command a = Assign String (NumExpr a) | Input String | Print String| Seq [C
 data NumExpr a = Var String | Const a | Plus (NumExpr a) (NumExpr a) | Minus (NumExpr a) (NumExpr a)
     | Times (NumExpr a) (NumExpr a) | Div (NumExpr a) (NumExpr a) deriving(Show)
 
-data BoolExpr a = AND (BoolExpr a) (BoolExpr a) | OR (BoolExpr a) (BoolExpr a) | NOT (BoolExpr a)
+data BoolExpr a = AND [BoolExpr a] | OR [BoolExpr a] | NOT [BoolExpr a]
     | Gt (NumExpr a) (NumExpr a) | Eq (NumExpr a) (NumExpr a)| Single Bool deriving(Show)
 
 readCommand:: (Read a,Num a) => String -> Command a
@@ -34,16 +34,27 @@ readCommandList entrada
 
 readNumExpr::(Read a,Num a) => [String] -> NumExpr a
 readNumExpr tokens
-    | (length tokens) == 1 && isNum = Const (read $ (head tokens))
-        where
-        isNum = (head (head tokens)) >= '0' && (head (head tokens)) <='9'
+    | (length tokens) == 1 && isNum = Const (read $ (removeEnd(head tokens)))
+    | (length tokens) == 1 = Var (head tokens)
+    | (tokens!!1) == "+" = Plus (readNumExpr ([head tokens])) (readNumExpr ([(tokens!!2)]))
+    | (tokens!!1) == "-" = Minus (readNumExpr ([head tokens])) (readNumExpr ([(tokens!!2)]))
+    | (tokens!!1) == "*" = Times (readNumExpr ([head tokens])) (readNumExpr ([(tokens!!2)]))
+    | (tokens!!1) == "/" = Div (readNumExpr ([head tokens])) (readNumExpr ([(tokens!!2)]))
+        where 
+            removeEnd palabra = (takeWhile (/= ';') palabra);
+            isNum = (head (head tokens)) >= '0' && (head (head tokens)) <='9'
+  
 
 
 readBoolExpr::(Read a,Num a) => [String] -> [BoolExpr a]
 readBoolExpr tokens
+    | tokens == [] = []
     | ((head tokens) == "END") || ((head tokens) == "THEN") || ((head tokens) == "DO")= []
-    | (head tokens) == "NOT" = [NOT (head $ readBoolExpr (tail tokens))]++(readBoolExpr (tail tokens))
+    | (head tokens) == "NOT" = [NOT (readBoolExpr (tail tokens))]
     | (tokens!!1) == ">" = [Gt (readNumExpr [(head tokens)]) (readNumExpr [(tokens!!2)])]++(readBoolExpr (drop 3 tokens))
+    | (head tokens) == "AND" = [AND (readBoolExpr (tail tokens))]
+    | (head tokens) == "OR" = [OR (readBoolExpr (tail tokens))]
+    | (tokens!!1) == "=" = [Eq (readNumExpr [(head tokens)]) (readNumExpr [(tokens!!2)])]++(readBoolExpr (drop 3 tokens))
 
 
 
