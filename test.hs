@@ -58,6 +58,45 @@ readBoolExpr tokens
 
 
 
+
+class SymTable m where
+    update:: m a -> String -> a -> m a
+    value:: m a -> String -> a
+    exists:: m a -> String -> Bool
+    start:: m a -> m a
+
+data LlistaParells a = Lista [(String,a)] deriving(Show)
+data Tree a = Node a (Tree a) (Tree a) | Empty deriving (Show)
+
+instance SymTable LlistaParells where
+    update m@(Lista mem) key nvalor
+      | not (exists m key) = Lista $ [(key,nvalor)] ++ mem
+      | otherwise = Lista $ reemplazar mem key nvalor
+        where
+            reemplazar::[(String,a)]-> String -> a -> [(String,a)]
+            reemplazar (x:xs) key nvalor
+                | fst x == key = [(key,nvalor)] ++ xs
+                | otherwise = [x] ++ (reemplazar xs key nvalor)
+
+            --reemplazar:: m a-> String -> a -> m a
+            --reemplazar m@(Lista (x:xs)) key nvalor
+              --  | fst x == key = Lista $ [(key,nvalor)] ++ xs
+                -- | otherwise = Lista $ [x] ++ (reemplazar2 xs key nvalor)
+
+    exists (Lista (x:xs)) key = (fst x == key) || exists (Lista xs) key;
+
+    value ( Lista (x:xs)) key
+       | (fst x) == key = snd x
+       | otherwise = value (Lista xs) key
+
+    start m = Lista []
+
+
+instance SymTable Tree where
+    start m = Empty
+
+
+
 --myFilter :: (a -> Bool) -> [a] -> [a]
 --myFilter f l = [x | x <- l, f x]
 
