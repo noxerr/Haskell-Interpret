@@ -1,12 +1,25 @@
 data Command a = Assign String (NumExpr a) | Input String | Print String| Seq [Command a]
     | Cond (BoolExpr a) (Command a) (Command a)| Loop (BoolExpr a) (Command a)
-    | NoCommand deriving(Show)
+    | NoCommand 
 
 data NumExpr a = Var String | Const a | Plus (NumExpr a) (NumExpr a) | Minus (NumExpr a) (NumExpr a)
     | Times (NumExpr a) (NumExpr a) | Div (NumExpr a) (NumExpr a) deriving(Show)
 
 data BoolExpr a = AND (BoolExpr a) (BoolExpr a) | OR (BoolExpr a) (BoolExpr a) | NOT (BoolExpr a)
     | Gt (NumExpr a) (NumExpr a) | Eq (NumExpr a) (NumExpr a)| Single Bool deriving(Show)
+
+
+
+instance (Show a) => Show (Command a) where
+    show(Input string) = "INPUT " ++ show string ++ ";"
+    show(Assign str nexpr) = show str ++ " = " ++ show nexpr ++ ";"
+    show(Print str) = "PRINT " ++ show str ++ ";"
+    show(Seq list) = unlines $ map show list
+    show(Cond bEx cIf cElse) = "IF " ++ show bEx ++ " THEN\n  " ++ show cIf ++ "ELSE\n  " ++ show cElse ++ "END"
+    show(Loop bEx loop) = "WHILE " ++ show bEx ++ "\nDO\n  " ++ show loop ++ "END"
+    show(cmd) = show cmd
+
+
 
     
 readCommand:: (Read a,Num a) => String -> Command a
@@ -239,9 +252,9 @@ interpretProgram inputs command = outputs
 
 
 
-expandAux :: [Command a] -> Command a
-expandAux ((Cond (OR b1 b2) commands comElse):xs)
-   = (Cond b1 commands (Cond b2 commands comElse))
+expandAux :: [Command a] -> [Command a]
+expandAux [] = []
+expandAux (c1:clist) = (expand c1):(expandAux clist)
 
 
 expand :: Command a -> Command a
@@ -250,9 +263,20 @@ expand comm@(Cond (OR b1 b2) commands comElse)
 expand comm@(Cond (AND b1 b2) commands comElse)
    = (Cond b1 (Cond b2 commands comElse) comElse)
 expand comm@(Cond _ commands comElse) = comm
+expand comm@(Seq commands) = Seq (expandAux commands)
 expand comm = comm
 
 
+
+
+
+
+instance (Eq a) => Eq (Command a) where
+  c1 == c2 = c1 == c2
+  
+  --Leaf a == Leaf b = a == b
+  --(Branch l1 r1) == (Branch l2 r2)  =  (l1==l2) && (r1==r2)
+  --_  == _   =  False
 --myFilter :: (a -> Bool) -> [a] -> [a]
 --myFilter f l = [x | x <- l, f x]
 
