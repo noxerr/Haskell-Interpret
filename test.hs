@@ -18,13 +18,15 @@ readCommand2 entrada
     | (head tokens) == "INPUT" = Input $ tokens!!1
     | (head tokens) == "PRINT" = Print $ tokens!!1
     | (tokens!!1) == ":=" = Assign (head tokens) (readNumExpr (drop 2 tokens))
-    | (head tokens) == "WHILE" = Loop (readBoolExpr (drop 1 (takeWhile (/= "DO") tokens))) (Seq (readCommandList (unwords(drop 1 (dropWhile (/="DO") tokens))))) 
+    | (head tokens) == "WHILE" = Loop (readBoolExpr (drop 1 (takeWhile (/= "DO") tokens))) (Seq (readCommandList (unwords(drop 1 (dropWhile (/="DO") tokens))))) --FIX WHILE
     | (head tokens) == "IF" = Cond (readBoolExpr (drop 1 (takeWhile (/="THEN") tokens))) 
-            (Seq (readCommandList (unwords(drop 1 (dropWhile (/="THEN") tokens)))))
+            (Seq (readCommandList (unwords (takeUntilEnd (drop 1 (dropWhile (/="THEN") tokens)) 1)) ))
             --(readCommand2 (unwords(drop 1(dropWhile (/="THEN") tokens)))) 
-            (Seq (readCommandList (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)))
+            --(Seq (readCommandList (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)))
+            (Seq (readCommandList (unwords (takeUntilEnd(words (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)) 1)) ))
             --(readCommand2 (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)) 
-    | otherwise = Input (unwords ["Hola OTHERWISE"])
+    | (head tokens) == "ELSE" = Input (unwords ["Hola Else"])
+    | otherwise = Input (unwords ["Hola OTHERWISE", (head tokens)])
         where
             tokens = words entrada
             removeEnd palabra = (takeWhile (/= ';') palabra) == palabra
@@ -34,7 +36,7 @@ gotoElse:: [String] -> Int -> String
 gotoElse [] _ = ""
 gotoElse tokens 0 = unwords tokens
 gotoElse tokens count
-    | (head tokens) == "ELSE" && (count == 1) = unwords (drop 1 tokens)
+    | (head tokens) == "ELSE" && (count == 1) = unwords (drop 1 tokens) --goto end
     | (head tokens) == "ELSE" = gotoElse (dropWhile (finishMark) (drop 1 tokens)) (count-1)
     | (head tokens) == "IF" = gotoElse (dropWhile (finishMark) (drop 1 tokens)) (count+1)
     | otherwise = gotoElse (drop 1 tokens) count
@@ -42,6 +44,18 @@ gotoElse tokens count
       where
       finishMark a = (a /= "IF") && (a /= "ELSE")
      
+
+
+
+takeUntilEnd:: [String] -> Int -> [String]
+takeUntilEnd [] _ = []
+takeUntilEnd tokens 0 = tokens
+takeUntilEnd tokens count
+    | (head tokens) == "END" && (count == 1) = []
+    | (head tokens) == "END" = [head tokens] ++ (takeUntilEnd (tail tokens) (count-1))
+    | (head tokens) == "IF" = [head tokens] ++ (takeUntilEnd (tail tokens) (count+1))
+    | (head tokens) == "DO" = [head tokens] ++ (takeUntilEnd (tail tokens) (count+1))
+    | otherwise = [head tokens] ++ (takeUntilEnd (tail tokens) count)
 
 
 gotoEnd:: [String] -> Int -> String
