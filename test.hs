@@ -15,21 +15,21 @@ readCommand entrada = Seq (readCommandList entrada)
 readCommand2:: (Read a,Num a) => String -> Command a
 readCommand2 entrada
     | tokens == [] = NoCommand
-    | (head tokens) == "INPUT" = Input $ tokens!!1
-    | (head tokens) == "PRINT" = Print $ tokens!!1
+    | (head tokens) == "INPUT" = Input (removeEnd (tokens!!1))
+    | (head tokens) == "PRINT" = Print (removeEnd (tokens!!1))
     | (tokens!!1) == ":=" = Assign (head tokens) (readNumExpr (drop 2 tokens))
     | (head tokens) == "WHILE" = Loop (readBoolExpr (drop 1 (takeWhile (/= "DO") tokens))) (Seq (readCommandList (unwords(drop 1 (dropWhile (/="DO") tokens))))) --FIX WHILE
     | (head tokens) == "IF" = Cond (readBoolExpr (drop 1 (takeWhile (/="THEN") tokens))) 
-            (Seq (readCommandList (unwords (takeUntilEnd (drop 1 (dropWhile (/="THEN") tokens)) 1)) ))
+            (Seq (readCommandList (unwords (takeUntilElse (drop 1 (dropWhile (/="THEN") tokens)) 1)) ))
             --(readCommand2 (unwords(drop 1(dropWhile (/="THEN") tokens)))) 
             --(Seq (readCommandList (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)))
             (Seq (readCommandList (unwords (takeUntilEnd(words (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)) 1)) ))
             --(readCommand2 (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)) 
     | (head tokens) == "ELSE" = Input (unwords ["Hola Else"])
-    | otherwise = Input (unwords ["Hola OTHERWISE", (head tokens)])
+    | otherwise = Print (unwords ["Hola OTHERWISE", (head tokens)])
         where
             tokens = words entrada
-            removeEnd palabra = (takeWhile (/= ';') palabra) == palabra
+            removeEnd palabra = (takeWhile (/= ';') palabra)
 
             
 gotoElse:: [String] -> Int -> String
@@ -56,6 +56,18 @@ takeUntilEnd tokens count
     | (head tokens) == "IF" = [head tokens] ++ (takeUntilEnd (tail tokens) (count+1))
     | (head tokens) == "DO" = [head tokens] ++ (takeUntilEnd (tail tokens) (count+1))
     | otherwise = [head tokens] ++ (takeUntilEnd (tail tokens) count)
+
+
+
+takeUntilElse:: [String] -> Int -> [String]
+takeUntilElse [] _ = []
+takeUntilElse tokens 0 = tokens
+takeUntilElse tokens count
+    | (head tokens) == "ELSE" && (count == 1) = []
+    | (head tokens) == "ELSE" = [head tokens] ++ (takeUntilElse (tail tokens) (count-1))
+    | (head tokens) == "IF" = [head tokens] ++ (takeUntilElse (tail tokens) (count+1))
+    | otherwise = [head tokens] ++ (takeUntilElse (tail tokens) count)
+
 
 
 gotoEnd:: [String] -> Int -> String
@@ -212,6 +224,7 @@ interpretCommand mem inputs (Loop bol commands)
   | otherwise = ((Left []), mem, inputs)
 interpretCommand mem inputs (Print var) = ((Left [value mem var]), mem, inputs)
 
+
 evaluateListInstr:: (SymTable m, Num a, Ord a) => m a -> [a] -> [Command a] -> ((Either [a] String),m a, [a])
 evaluateListInstr mem inputs (x:[]) = interpretCommand mem inputs x
 evaluateListInstr mem inputs (x:xs) = evaluateListInstr newMem ins xs --evaluar command antes que el resto de la lista
@@ -223,6 +236,21 @@ interpretProgram:: (Num a, Ord a) => [a] -> Command a -> (Either [a] String)
 interpretProgram inputs command = outputs
    where
      (outputs, mem, inputs2) = interpretCommand (start Empty) inputs command
+
+
+
+expandAux :: [Command a] -> Command a
+expandAux ((Cond (OR b1 b2) commands comElse):xs)
+   = (Cond b1 commands (Cond b2 commands comElse))
+
+
+expand :: Command a -> Command a
+expand comm@(Cond (OR b1 b2) commands comElse)
+   = (Cond b1 commands (Cond b2 commands comElse))
+expand comm@(Cond (AND b1 b2) commands comElse)
+   = (Cond b1 (Cond b2 commands comElse) comElse)
+expand comm@(Cond _ commands comElse) = comm
+expand comm = comm
 
 
 --myFilter :: (a -> Bool) -> [a] -> [a]
