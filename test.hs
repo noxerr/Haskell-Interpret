@@ -18,10 +18,12 @@ readCommand2 entrada
     | (head tokens) == "INPUT" = Input $ tokens!!1
     | (head tokens) == "PRINT" = Print $ tokens!!1
     | (tokens!!1) == ":=" = Assign (head tokens) (readNumExpr (drop 2 tokens))
-    | (head tokens) == "WHILE" = Loop (readBoolExpr (tail tokens)) (readCommand2 (unwords(drop 1 (dropWhile (/="DO") tokens)))) 
+    | (head tokens) == "WHILE" = Loop (readBoolExpr (drop 1 (takeWhile (/= "DO") tokens))) (Seq (readCommandList (unwords(drop 1 (dropWhile (/="DO") tokens))))) 
     | (head tokens) == "IF" = Cond (readBoolExpr (drop 1 (takeWhile (/="THEN") tokens))) 
-            (readCommand2 (unwords(drop 1(dropWhile (/="THEN") tokens)))) 
-            (readCommand2 (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)) 
+            (Seq (readCommandList (unwords(drop 1 (dropWhile (/="THEN") tokens)))))
+            --(readCommand2 (unwords(drop 1(dropWhile (/="THEN") tokens)))) 
+            (Seq (readCommandList (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)))
+            --(readCommand2 (gotoElse (drop 1(dropWhile (/="THEN") tokens)) 1)) 
     | otherwise = Input (unwords ["Hola OTHERWISE"])
         where
             tokens = words entrada
@@ -52,7 +54,7 @@ gotoEnd tokens count
     | (head tokens) == "DO" = gotoEnd (dropWhile (finishMark) (drop 1 tokens)) (count+1)
     | otherwise = gotoEnd (drop 1 tokens) count
       where
-        finishMark a = (a /= "IF") && (a /= "DO")
+        finishMark a = (a /= "IF") && (a /= "DO") && (a /= "END")
 
 --IF X > 0 OR X = 0 OR NOT 0 > Y THEN
 --WHILE X > Y
@@ -64,6 +66,7 @@ readCommandList:: (Read a,Num a) => String -> [Command a]
 readCommandList entrada
     | tokens == [] = []
     | ((head tokens) == "IF") = [readCommand2 entrada]++(readCommandList (gotoEnd (drop 1 tokens) 1))
+    | ((head tokens) == "WHILE") = [readCommand2 entrada]++(readCommandList (gotoEnd (drop 1 tokens) 1))
     | otherwise = [readCommand2 entrada]++(readCommandList (unwords(drop 1(dropWhile (checkValue) tokens))))
         where
             tokens = words entrada
@@ -159,8 +162,53 @@ instance SymTable Tree where
       | (fst n) == key = (Node (key, nValue) iz der)
       
     
-      
 
+evalExprNum :: (Num a,SymTable m,Ord a) => m a -> NumExpr a -> a
+evalExprNum mem (Const n) = n
+evalExprNum mem (Var x) = value mem x
+evalExprNum mem (Plus n n2) = (evalExprNum mem n) + (evalExprNum mem n2)
+evalExprNum mem (Div n n2) = myDiv (evalExprNum mem n) (evalExprNum mem n2)
+evalExprNum mem (Times n n2) = (evalExprNum mem n) + (evalExprNum mem n2)
+evalExprNum mem (Minus n n2) = (evalExprNum mem n) - (evalExprNum mem n2)
+
+
+myDiv :: (Num a, Ord a) => a -> a -> a
+myDiv dividendo divisor 
+  | dividendo < divisor = 0
+myDiv dividendo divisor = 1+(myDiv (dividendo-divisor) divisor)
+
+evalBoolExpr :: (Num a,SymTable m,Ord a) => m a -> BoolExpr a -> Bool
+evalBoolExpr mem (Gt n1 n2) = (evalExprNum mem n1) > (evalExprNum mem n2)
+evalBoolExpr mem (AND b1 b2) = (evalBoolExpr mem b1) && (evalBoolExpr mem b2)
+evalBoolExpr mem (OR b1 b2) = (evalBoolExpr mem b1) || (evalBoolExpr mem b2)
+evalBoolExpr mem (Eq n1 n2) = (evalExprNum mem n1) == (evalExprNum mem n2)
+evalBoolExpr mem (NOT b1) = not (evalBoolExpr mem b1)
+evalBoolExpr mem _ = True
+    
+
+interpretCommand :: (SymTable m, Num a, Ord a) => m a -> [a] -> Command a -> ((Either [a] String),m a, [a])
+interpretCommand mem inputs (Assign varName exp1) = ((Left []), (update mem varName (evalExprNum mem exp1)) , inputs)
+interpretCommand mem inputs@(x:xs) (Input string) = ((Left []), (update mem string x),xs)
+interpretCommand mem inputs (Seq list) = evaluateListInstr mem inputs list
+interpretCommand mem inputs (Cond bol commands comElse) 
+  | evalBoolExpr mem bol = interpretCommand mem inputs commands
+  | otherwise = interpretCommand mem inputs comElse
+interpretCommand mem inputs (Loop bol commands) 
+  | evalBoolExpr mem bol = interpretCommand mem inputs commands
+  | otherwise = ((Left []), mem, inputs)
+interpretCommand mem inputs (Print var) = ((Left [value mem var]), mem, inputs)
+
+evaluateListInstr:: (SymTable m, Num a, Ord a) => m a -> [a] -> [Command a] -> ((Either [a] String),m a, [a])
+evaluateListInstr mem inputs (x:[]) = interpretCommand mem inputs x
+evaluateListInstr mem inputs (x:xs) = evaluateListInstr newMem ins xs --evaluar command antes que el resto de la lista
+    where
+        ret@((Left []), newMem , ins) = interpretCommand mem inputs x
+
+
+interpretProgram:: (Num a, Ord a) => [a] -> Command a -> (Either [a] String)
+interpretProgram inputs command = outputs
+   where
+     (outputs, mem, inputs2) = interpretCommand (start Empty) inputs command
 
 
 --myFilter :: (a -> Bool) -> [a] -> [a]
